@@ -1,7 +1,7 @@
 name: Pure AI Telegram Assistant
 
 on:
-  workflow_dispatch: # Startet die KI-Abfrage, wenn du den Button drückst
+  workflow_dispatch: # Ermöglicht den manuellen Start für eine 5-Minuten-Session
 
 jobs:
   run-ai:
@@ -20,59 +20,64 @@ jobs:
           python -m pip install --upgrade pip
           pip install requests pyTelegramBotAPI openai
 
-      - name: PURE KI ASSISTENT RUN
+      - name: 5-MINUTEN DAUERBETRIEB KI RUN
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.KI_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
           cat << 'EOF' > pure_ai.py
-          import os, telebot
+          import os, telebot, sys
           from openai import OpenAI
 
           BOT_TOKEN = str(os.getenv("TELEGRAM_BOT_TOKEN")).strip()
-          CHAT_ID = str(os.getenv("TELEGRAM_CHAT_ID")).strip()
           OPENAI_KEY = str(os.getenv("OPENAI_API_KEY")).strip()
 
           bot = telebot.TeleBot(BOT_TOKEN)
           ai_client = OpenAI(api_key=OPENAI_KEY)
 
-          try:
-              updates = bot.get_updates(limit=10, timeout=1)
-              if not updates:
-                  print("Keine neuen Nachrichten im KI-Bot.")
-                  exit(0)
+          print("=== KI DAUER-GEHIRN AKTIVIERT ===")
+
+          # 1. REAKTION AUF JEDEN TEXT (CHATGPT)
+          @bot.message_handler(func=lambda message: True)
+          def handle_all_messages(message):
+              msg_text = message.text
+              chat_id = message.chat.id
+              print(f"Empfange Nachricht: {msg_text}")
               
-              last_update = updates[-1]
-              if not hasattr(last_update, 'message') or last_update.message is None: exit(0)
-              
-              msg_text = last_update.message.text
-              chat_id = last_update.message.chat.id
-              
-              print(f"KI verarbeitet Nachricht: {msg_text}")
-              
-              # BILD GENERIEREN
+              # Prüfen, ob ein Bild gewünscht ist
               if "bild" in msg_text.lower() or "image" in msg_text.lower():
                   bot.send_message(chat_id, "🎨 KI generiert dein Bild... Bitte kurz warten...")
-                  response = ai_client.images.generate(
-                      model="dall-e-3",
-                      prompt=msg_text,
-                      n=1,
-                      size="1024x1024"
-                  )
-                  bot.send_photo(chat_id, response.data.url, caption="Dein KI-Meisterwerk, Bro! 🔥")
+                  try:
+                      response = ai_client.images.generate(
+                          model="dall-e-3",
+                          prompt=msg_text,
+                          n=1,
+                          size="1024x1024"
+                      )
+                      bot.send_photo(chat_id, response.data.url, caption="Dein KI-Meisterwerk, Bro! 🔥")
+                  except Exception as img_err:
+                      bot.send_message(chat_id, f"❌ Bildfehler: {img_err}")
               
-              # TEXT ANTWORT (CHATGPT)
+              # Normale ChatGPT-Antwort
               else:
-                  response = ai_client.chat.completions.create(
-                      model="gpt-4o",
-                      messages=[
-                          {"role": "system", "content": "Du bist ein extrem loyaler, schlauer und brüderlicher KI-Assistent. Antworte immer direkt und auf Deutsch."},
-                          {"role": "user", "content": msg_text}
-                      ]
-                  )
-                  bot.send_message(chat_id, response.choices.message.content)
+                  bot.send_chat_action(chat_id, 'typing')
+                  try:
+                      response = ai_client.chat.completions.create(
+                          model="gpt-4o",
+                          messages=[
+                              {"role": "system", "content": "Du bist ein extrem loyaler, schlauer und brüderlicher KI-Assistent. Antworte immer direkt, cool und auf Deutsch."},
+                              {"role": "user", "content": msg_text}
+                          ]
+                      )
+                      bot.send_message(chat_id, response.choices.message.content)
+                  except Exception as text_err:
+                      bot.send_message(chat_id, f"❌ Textfehler: {text_err}")
+
+          # Startet das Dauer-Hören (läuft im Workflow für ca. 4-5 Minuten aktiv)
+          try:
+              bot.polling(none_stop=True, timeout=60, long_polling_timeout=60)
           except Exception as e:
-              print(f"Fehler: {e}")
+              print(f"Polling beendet: {e}")
           EOF
           python pure_ai.py
+
