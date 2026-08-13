@@ -1,7 +1,9 @@
 name: TikTok Viral Video Generator
 
 on:
-  workflow_dispatch:
+  schedule:
+    - cron: '0 16 * * *' # JETZT AUF VOLL-AUTOPILOT: Jeden Tag um exakt 16:00 Uhr!
+  workflow_dispatch: # Der Button bleibt da, falls du manuell noch eins willst
 
 jobs:
   build-video:
@@ -25,7 +27,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install requests pyTelegramBotAPI gTTS moviepy
 
-      - name: GENERIERE VIRALES TIKTOK VIDEO
+      - name: GENERIERE VIRALES TIKTOK VIDEO MIT UNTERTITELN
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.KI_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
@@ -33,7 +35,7 @@ jobs:
           cat << 'EOF' > make_video.py
           import os, requests, random, telebot
           from gtts import gTTS
-          from moviepy import AudioFileClip, VideoFileClip, ColorClip
+          from moviepy import AudioFileClip, VideoFileClip, TextClip, CompositeVideoClip
 
           BOT_TOKEN = str(os.getenv("TELEGRAM_BOT_TOKEN")).strip()
           CHAT_ID = str(os.getenv("TELEGRAM_CHAT_ID")).strip()
@@ -58,19 +60,50 @@ jobs:
           duration = audio_clip.duration
           print(f"Video-Dauer wird: {duration} Sekunden")
 
+          print("Lade virales GTA-Hintergrundvideo herunter...")
+          bg_url = "https://r2.dev"
+          bg_res = requests.get(bg_url)
+          with open("gta_bg.mp4", "wb") as f:
+              f.write(bg_res.content)
+
           print("Schneide Video zusammen...")
-          video_clip = ColorClip(size=(1080, 1920), color=(20, 20, 35), duration=duration)
+          full_video = VideoFileClip("gta_bg.mp4")
+          video_clip = full_video.subclipped(0, duration)
+
+          # --- UNTERTITEL LOGIK (GENERIERUNG) ---
+          print("Erzeuge Untertitel-Texte...")
+          words = selected_story.split()
+          chunks = [" ".join(words[i:i+4]) for i in range(0, len(words), 4)] # Immer 4 Wörter pro Block
           
-          # HIER IST DER FIX FÜR MOVIEPY v2.0 (.with_audio statt .set_audio)
-          final_clip = video_clip.with_audio(audio_clip)
-          final_clip.write_videofile("tiktok_output.mp4", fps=24, codec="libx264", audio_codec="aac")
+          text_clips = []
+          time_per_chunk = duration / len(chunks)
+          
+          for idx, chunk in enumerate(chunks):
+              start_time = idx * time_per_chunk
+              end_time = (idx + 1) * time_per_chunk
+              
+              # Erstellt den Text-Clip mitten im Bild
+              txt = (TextClip(text=chunk, font_size=55, color="white", font="Arial-Bold", 
+                              stroke_color="black", stroke_width=3, method="caption", size=(900, None))
+                     .with_start(start_time)
+                     .with_duration(end_time - start_time)
+                     .with_position(("center", "center")))
+              text_clips.append(txt)
+
+          # GTA-Video und alle Untertitel übereinanderlegen
+          final_video = CompositeVideoClip([video_clip] + text_clips)
+          final_video = final_video.with_audio(audio_clip)
+
+          print("Rendere finales MP4...")
+          final_video.write_videofile("tiktok_output.mp4", fps=24, codec="libx264", audio_codec="aac")
 
           print("Sende Video an Telegram...")
-          bot.send_message(CHAT_ID, f"🚀 DEIN NEUES TIKTOK-VIDEO IST FERTIG, BRO!\n\n📄 **Text des Videos:**\n\"{selected_story}\"\n\nLade es jetzt einfach auf dein Handy und pack es direkt auf TikTok! Let's go!")
+          bot.send_message(CHAT_ID, f"💰 AUTOMATISCHER TIKTOK-UP-LOAD BEREIT, BRO!\n\nDas Video wurde vollautomatisch um 16:00 Uhr generiert. Speicher es ab und lade es hoch, um Klicks zu sammeln!")
           
           with open("tiktok_output.mp4", "rb") as video_file:
               bot.send_video(CHAT_ID, video_file, timeout=120)
 
+          full_video.close()
           print("=== VIDEO ERFOLGREICH AN TELEGRAM GESENDET ===")
           EOF
           python make_video.py
