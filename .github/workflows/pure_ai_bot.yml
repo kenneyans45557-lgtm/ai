@@ -33,7 +33,6 @@ jobs:
           cat << 'EOF' > make_video.py
           import os, requests, random, telebot
           from gtts import gTTS
-          # HIER IST DER FIX: Neuer Import-Weg für die aktuelle MoviePy-Version!
           from moviepy import AudioFileClip, VideoFileClip, ColorClip
 
           BOT_TOKEN = str(os.getenv("TELEGRAM_BOT_TOKEN")).strip()
@@ -62,7 +61,8 @@ jobs:
           print("Schneide Video zusammen...")
           video_clip = ColorClip(size=(1080, 1920), color=(20, 20, 35), duration=duration)
           
-          final_clip = video_clip.set_audio(audio_clip)
+          # HIER IST DER FIX FÜR MOVIEPY v2.0 (.with_audio statt .set_audio)
+          final_clip = video_clip.with_audio(audio_clip)
           final_clip.write_videofile("tiktok_output.mp4", fps=24, codec="libx264", audio_codec="aac")
 
           print("Sende Video an Telegram...")
