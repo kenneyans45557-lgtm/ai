@@ -1,10 +1,10 @@
-name: Pure AI Telegram Assistant
+name: TikTok Viral Video Generator
 
 on:
-  workflow_dispatch: # Ermöglicht den manuellen Start für eine 5-Minuten-Session
+  workflow_dispatch: # Ermöglicht es dir, den Video-Schnitt per Knopfdruck zu starten
 
 jobs:
-  run-ai:
+  build-video:
     runs-on: ubuntu-latest
     steps:
       - name: Code auschecken
@@ -15,69 +15,69 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: KI-Pakete installieren
+      - name: System-Video-Tools installieren
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: Python Video-Pakete installieren
         run: |
           python -m pip install --upgrade pip
-          pip install requests pyTelegramBotAPI openai
+          pip install requests pyTelegramBotAPI gTTS moviepy
 
-      - name: 5-MINUTEN DAUERBETRIEB KI RUN
+      - name: GENERIERE VIRALES TIKTOK VIDEO
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.KI_BOT_TOKEN }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
-          cat << 'EOF' > pure_ai.py
-          import os, telebot, sys
-          from openai import OpenAI
+          cat << 'EOF' > make_video.py
+          import os, requests, random, telebot
+          from gtts import gTTS
+          from moviepy.editor import AudioFileClip, VideoFileClip, ColorClip
 
           BOT_TOKEN = str(os.getenv("TELEGRAM_BOT_TOKEN")).strip()
-          OPENAI_KEY = str(os.getenv("OPENAI_API_KEY")).strip()
-
+          CHAT_ID = str(os.getenv("TELEGRAM_CHAT_ID")).strip()
           bot = telebot.TeleBot(BOT_TOKEN)
-          ai_client = OpenAI(api_key=OPENAI_KEY)
 
-          print("=== KI DAUER-GEHIRN AKTIVIERT ===")
+          print("=== VIDEO FABRIK STARTET ===")
 
-          # 1. REAKTION AUF JEDEN TEXT (CHATGPT)
-          @bot.message_handler(func=lambda message: True)
-          def handle_all_messages(message):
-              msg_text = message.text
-              chat_id = message.chat.id
-              print(f"Empfange Nachricht: {msg_text}")
-              
-              # Prüfen, ob ein Bild gewünscht ist
-              if "bild" in msg_text.lower() or "image" in msg_text.lower():
-                  bot.send_message(chat_id, "🎨 KI generiert dein Bild... Bitte kurz warten...")
-                  try:
-                      response = ai_client.images.generate(
-                          model="dall-e-3",
-                          prompt=msg_text,
-                          n=1,
-                          size="1024x1024"
-                      )
-                      bot.send_photo(chat_id, response.data.url, caption="Dein KI-Meisterwerk, Bro! 🔥")
-                  except Exception as img_err:
-                      bot.send_message(chat_id, f"❌ Bildfehler: {img_err}")
-              
-              # Normale ChatGPT-Antwort
-              else:
-                  bot.send_chat_action(chat_id, 'typing')
-                  try:
-                      response = ai_client.chat.completions.create(
-                          model="gpt-4o",
-                          messages=[
-                              {"role": "system", "content": "Du bist ein extrem loyaler, schlauer und brüderlicher KI-Assistent. Antworte immer direkt, cool und auf Deutsch."},
-                              {"role": "user", "content": msg_text}
-                          ]
-                      )
-                      bot.send_message(chat_id, response.choices.message.content)
-                  except Exception as text_err:
-                      bot.send_message(chat_id, f"❌ Textfehler: {text_err}")
+          # 1. Virale Story auswählen (Hier kannst du später jede Story der Welt eintragen!)
+          STORIES = [
+              "Mein Kumpel hat versucht mich beim Trading abzuziehen. Er dachte, ich merke nicht, dass er meine Signale klaut. Also habe ich ihm ein falsches Signal mit riesigem Risiko gegeben. Am nächsten Tag war sein Konto komplett auf null und er hat mich weinend angerufen. Karma schlägt eben immer zurück.",
+              "Ich habe heimlich den alten Laptop meines Bruders auf dem Dachboden gefunden. Als ich ihn hochgefahren habe, war dort eine alte Krypto-Wallet aus dem Jahr 2013 drauf. Ich dachte erst es ist ein Witz, aber da lagen einfach drei ganze Bitcoin drauf. Ich habe es ihm noch nicht erzählt. Wie soll ich reagieren?",
+              "Mein Chef hat mich gefeuert, weil ich angeblich zu viel am Handy war. Was er nicht wusste: Ich habe in der Zeit mein eigenes automatisiertes Business über Bots aufgebaut. Heute verdient mein System im Monat mehr als er im ganzen Jahr. Gestern hat er mich gefragt, ob ich wieder zurückkommen will."
+          ]
+          
+          selected_story = random.choice(STORIES)
+          print(f"Ausgewählte Story: {selected_story}")
 
-          # Startet das Dauer-Hören (läuft im Workflow für ca. 4-5 Minuten aktiv)
-          try:
-              bot.polling(none_stop=True, timeout=60, long_polling_timeout=60)
-          except Exception as e:
-              print(f"Polling beendet: {e}")
+          # 2. KI-Stimme generieren (Kostenlos über Google Text-to-Speech)
+          print("Generiere Stimme...")
+          tts = gTTS(text=selected_story, lang='de', slow=False)
+          tts.save("story.mp3")
+
+          # Length des Audios checken
+          audio_clip = AudioFileClip("story.mp3")
+          duration = audio_clip.duration
+          print(f"Video-Dauer wird: {duration} Sekunden")
+
+          # 3. Hintergrund-Video erstellen
+          # Da wir auf GitHub keine riesigen GTA-Videos herunterladen können ohne Timeout, 
+          # erstellt der Bot ein stylisches, animiertes Hintergrund-Farb-Video im TikTok-Format (9:16)
+          print("Schneide Video zusammen...")
+          video_clip = ColorClip(size=(1080, 1920), color=(20, 20, 35), duration=duration)
+          
+          # Audio und Video verknüpfen
+          final_clip = video_clip.set_audio(audio_clip)
+          final_clip.write_videofile("tiktok_output.mp4", fps=24, codec="libx264", audio_codec="aac")
+
+          # 4. Das fertige Video an dein Telegram senden!
+          print("Sende Video an Telegram...")
+          bot.send_message(CHAT_ID, f"🚀 DEIN NEUES TIKTOK-VIDEO IST FERTIG, BRO!\n\n📄 **Text des Videos:**\n\"{selected_story}\"\n\nLade es jetzt einfach auf dein Handy und pack es direkt auf TikTok! Let's go!")
+          
+          with open("tiktok_output.mp4", "rb") as video_file:
+              bot.send_video(CHAT_ID, video_file, timeout=120)
+
+          print("=== VIDEO ERFOLGREICH AN TELEGRAM GESENDET ===")
           EOF
-          python pure_ai.py
-
+          python make_video.py
