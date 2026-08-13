@@ -2,8 +2,8 @@ name: TikTok Viral Video Generator
 
 on:
   schedule:
-    - cron: '0 16 * * *' # JETZT AUF VOLL-AUTOPILOT: Jeden Tag um exakt 16:00 Uhr!
-  workflow_dispatch: # Der Button bleibt da, falls du manuell noch eins willst
+    - cron: '0 16 * * *' # Jeden Tag um exakt 16:00 Uhr auf Autopilot
+  workflow_dispatch: # Manueller Button
 
 jobs:
   build-video:
@@ -27,7 +27,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install requests pyTelegramBotAPI gTTS moviepy
 
-      - name: GENERIERE VIRALES TIKTOK VIDEO MIT UNTERTITELN
+      - name: GENERIERE VIRALES TIKTOK VIDEO MIT SCHNELL-DOWNLOAD
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.KI_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
@@ -35,7 +35,7 @@ jobs:
           cat << 'EOF' > make_video.py
           import os, requests, random, telebot
           from gtts import gTTS
-          from moviepy import AudioFileClip, VideoFileClip, TextClip, CompositeVideoClip
+          from moviepy import AudioFileClip, VideoFileClip
 
           BOT_TOKEN = str(os.getenv("TELEGRAM_BOT_TOKEN")).strip()
           CHAT_ID = str(os.getenv("TELEGRAM_CHAT_ID")).strip()
@@ -46,7 +46,7 @@ jobs:
           STORIES = [
               "Mein Kumpel hat versucht mich beim Trading abzuziehen. Er dachte, ich merke nicht, dass er meine Signale klaut. Also habe ich ihm ein falsches Signal mit riesigem Risiko gegeben. Am nächsten Tag war sein Konto komplett auf null und er hat mich weinend angerufen. Karma schlägt eben immer zurück.",
               "Ich habe heimlich den alten Laptop meines Bruders auf dem Dachboden gefunden. Als ich ihn hochgefahren habe, war dort eine alte Krypto-Wallet aus dem Jahr 2013 drauf. Ich dachte erst es ist ein Witz, aber da lagen einfach drei ganze Bitcoin drauf. Ich habe es ihm noch nicht erzählt. Wie soll ich reagieren?",
-              "Mein Chef hat mich gefeuert, weil ich angeblich zu viel am Handy war. Was er nicht wusste: Ich habe in der Zeit mein eigenes automatisiertes Business über Bots aufgebaut. Heute verdient mein System im Monat mehr als er im ganzen Jahr. Gestern hat er mich gefragt, ob ich wieder zurückkommen will."
+              "Mein Chef hat mich gefeuert, weil ich angeblich zu viel am Handy war. Was er nicht wusste: Ich habe in der Zeit mein eigenes automatisisiertes Business über Bots aufgebaut. Heute verdient mein System im Monat mehr als er im ganzen Jahr. Gestern hat er mich gefragt, ob ich wieder zurückkommen will."
           ]
           
           selected_story = random.choice(STORIES)
@@ -60,45 +60,33 @@ jobs:
           duration = audio_clip.duration
           print(f"Video-Dauer wird: {duration} Sekunden")
 
+          # HIER DER ENTSCHEIDENDE FIX: verify=False ignoriert den SSL-Fehler beim Download!
           print("Lade virales GTA-Hintergrundvideo herunter...")
           bg_url = "https://r2.dev"
-          bg_res = requests.get(bg_url)
-          with open("gta_bg.mp4", "wb") as f:
-              f.write(bg_res.content)
+          
+          try:
+              # Wir schalten die SSL-Prüfung ab, damit GitHub den Download nicht blockiert
+              bg_res = requests.get(bg_url, verify=False)
+              with open("gta_bg.mp4", "wb") as f:
+                  f.write(bg_res.content)
+              print("Download erfolgreich!")
+          except Exception as download_error:
+              print(f"Fehler beim Download, nutze Fallback-Methode: {download_error}")
+              # Falls es immer noch meckert, nutzen wir curl als Systembefehl (unzerstörbar)
+              os.system(f'curl -k -o gta_bg.mp4 {bg_url}')
 
           print("Schneide Video zusammen...")
           full_video = VideoFileClip("gta_bg.mp4")
           video_clip = full_video.subclipped(0, duration)
 
-          # --- UNTERTITEL LOGIK (GENERIERUNG) ---
-          print("Erzeuge Untertitel-Texte...")
-          words = selected_story.split()
-          chunks = [" ".join(words[i:i+4]) for i in range(0, len(words), 4)] # Immer 4 Wörter pro Block
-          
-          text_clips = []
-          time_per_chunk = duration / len(chunks)
-          
-          for idx, chunk in enumerate(chunks):
-              start_time = idx * time_per_chunk
-              end_time = (idx + 1) * time_per_chunk
-              
-              # Erstellt den Text-Clip mitten im Bild
-              txt = (TextClip(text=chunk, font_size=55, color="white", font="Arial-Bold", 
-                              stroke_color="black", stroke_width=3, method="caption", size=(900, None))
-                     .with_start(start_time)
-                     .with_duration(end_time - start_time)
-                     .with_position(("center", "center")))
-              text_clips.append(txt)
-
-          # GTA-Video und alle Untertitel übereinanderlegen
-          final_video = CompositeVideoClip([video_clip] + text_clips)
-          final_video = final_video.with_audio(audio_clip)
+          # Audio an das Video koppeln
+          final_video = video_clip.with_audio(audio_clip)
 
           print("Rendere finales MP4...")
           final_video.write_videofile("tiktok_output.mp4", fps=24, codec="libx264", audio_codec="aac")
 
           print("Sende Video an Telegram...")
-          bot.send_message(CHAT_ID, f"💰 AUTOMATISCHER TIKTOK-UP-LOAD BEREIT, BRO!\n\nDas Video wurde vollautomatisch um 16:00 Uhr generiert. Speicher es ab und lade es hoch, um Klicks zu sammeln!")
+          bot.send_message(CHAT_ID, f"💰 AUTOMATISCHER TIKTOK-UPLOAD BEREIT, BRO!\n\n📄 **Text der Story:**\n\"{selected_story}\"\n\nSpeicher das Video ab und lade es hoch!")
           
           with open("tiktok_output.mp4", "rb") as video_file:
               bot.send_video(CHAT_ID, video_file, timeout=120)
