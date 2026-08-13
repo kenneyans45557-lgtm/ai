@@ -1,7 +1,7 @@
 name: TikTok Viral Video Generator
 
 on:
-  workflow_dispatch: # Ermöglicht es dir, den Video-Schnitt per Knopfdruck zu starten
+  workflow_dispatch:
 
 jobs:
   build-video:
@@ -33,7 +33,8 @@ jobs:
           cat << 'EOF' > make_video.py
           import os, requests, random, telebot
           from gtts import gTTS
-          from moviepy.editor import AudioFileClip, VideoFileClip, ColorClip
+          # HIER IST DER FIX: Neuer Import-Weg für die aktuelle MoviePy-Version!
+          from moviepy import AudioFileClip, VideoFileClip, ColorClip
 
           BOT_TOKEN = str(os.getenv("TELEGRAM_BOT_TOKEN")).strip()
           CHAT_ID = str(os.getenv("TELEGRAM_CHAT_ID")).strip()
@@ -41,7 +42,6 @@ jobs:
 
           print("=== VIDEO FABRIK STARTET ===")
 
-          # 1. Virale Story auswählen (Hier kannst du später jede Story der Welt eintragen!)
           STORIES = [
               "Mein Kumpel hat versucht mich beim Trading abzuziehen. Er dachte, ich merke nicht, dass er meine Signale klaut. Also habe ich ihm ein falsches Signal mit riesigem Risiko gegeben. Am nächsten Tag war sein Konto komplett auf null und er hat mich weinend angerufen. Karma schlägt eben immer zurück.",
               "Ich habe heimlich den alten Laptop meines Bruders auf dem Dachboden gefunden. Als ich ihn hochgefahren habe, war dort eine alte Krypto-Wallet aus dem Jahr 2013 drauf. Ich dachte erst es ist ein Witz, aber da lagen einfach drei ganze Bitcoin drauf. Ich habe es ihm noch nicht erzählt. Wie soll ich reagieren?",
@@ -51,27 +51,20 @@ jobs:
           selected_story = random.choice(STORIES)
           print(f"Ausgewählte Story: {selected_story}")
 
-          # 2. KI-Stimme generieren (Kostenlos über Google Text-to-Speech)
           print("Generiere Stimme...")
           tts = gTTS(text=selected_story, lang='de', slow=False)
           tts.save("story.mp3")
 
-          # Length des Audios checken
           audio_clip = AudioFileClip("story.mp3")
           duration = audio_clip.duration
           print(f"Video-Dauer wird: {duration} Sekunden")
 
-          # 3. Hintergrund-Video erstellen
-          # Da wir auf GitHub keine riesigen GTA-Videos herunterladen können ohne Timeout, 
-          # erstellt der Bot ein stylisches, animiertes Hintergrund-Farb-Video im TikTok-Format (9:16)
           print("Schneide Video zusammen...")
           video_clip = ColorClip(size=(1080, 1920), color=(20, 20, 35), duration=duration)
           
-          # Audio und Video verknüpfen
           final_clip = video_clip.set_audio(audio_clip)
           final_clip.write_videofile("tiktok_output.mp4", fps=24, codec="libx264", audio_codec="aac")
 
-          # 4. Das fertige Video an dein Telegram senden!
           print("Sende Video an Telegram...")
           bot.send_message(CHAT_ID, f"🚀 DEIN NEUES TIKTOK-VIDEO IST FERTIG, BRO!\n\n📄 **Text des Videos:**\n\"{selected_story}\"\n\nLade es jetzt einfach auf dein Handy und pack es direkt auf TikTok! Let's go!")
           
